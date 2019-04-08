@@ -42,6 +42,7 @@ class DouBanGame(Model):
 
 
 def get_data(genres):
+    logging.info(genres)
     # print('Run task as %s (%s)...' % (genres, os.getpid()))
 
     id_all_reverse = dict([val, key] for key, val in id_all.items())
@@ -50,9 +51,14 @@ def get_data(genres):
 
     headers = {"User-Agent": UserAgent(verify_ssl=False).random}
 
-    page_data = requests.get(link, headers=headers)
+    page_data = requests.get(link, headers=headers,
+                             # proxies={'https': 'http://127.0.0.1:8888'},
+                             # verify=False
+                             )
 
     init_data = json.loads(page_data.text)
+
+    logging.info(init_data)
 
     col = ['name', 'star', 'rating', 'platforms', 'n_ratings', 'genres', 'content']
 
@@ -69,37 +75,45 @@ def get_data(genres):
         else:
             n = init_data['more']
 
-        init_data = json.loads(requests.get(comment_api.format(genres, n), headers=headers).text)
+        init_data = json.loads(
+            requests.get(comment_api.format(genres, n), headers=headers,
+                         # proxies={'https': 'http://127.0.0.1:8888'},
+                         # verify=False
+                         ).text)
 
         current_games = init_data['games']
 
         length = len(init_data['games'])
 
-        for j in range(length - 1):
-            data.append({
-                'title': current_games[j]['title'],
-                'cover': current_games[j]['cover'],
-                'type': game_type,
-                'star': current_games[j]['star'],
-                'rating': current_games[j]['rating'],
-                'platforms': current_games[j]['platforms'],
-                'n_ratings': current_games[j]['n_ratings'],
-                'genres': current_games[j]['genres'],
-                'content': (current_games[j]['review']['content'] if isinstance(current_games[j]['review']['content'],
-                                                                                str) else ''),
-                'create_at': datetime.datetime.now()
-            })
-            i += 1
-        # time.sleep(0.8)
+        try:
 
-        if data:
-            print(data)
-            last_id = DouBanGame.insert_many(data).execute()
-            print(last_id)
-        else:
-            print('empty data!')
-            print('NO%s' % i)
-            break
+            for j in range(length - 1):
+                data.append({
+                    'title': current_games[j]['title'],
+                    'cover': current_games[j]['cover'],
+                    'type': game_type,
+                    'star': current_games[j]['star'],
+                    'rating': current_games[j]['rating'],
+                    'platforms': current_games[j]['platforms'],
+                    'n_ratings': current_games[j]['n_ratings'],
+                    'genres': current_games[j]['genres'],
+                    'content': (
+                        current_games[j]['review']['content'] if isinstance(current_games[j]['review']['content'],
+                                                                            str) else ''),
+                    'create_at': datetime.datetime.now()
+                })
+                i += 1
+            # time.sleep(0.8)
+
+            if data:
+                last_id = DouBanGame.insert_many(data).execute()
+                print(last_id)
+            else:
+                print('empty data!')
+                print('NO%s' % i)
+                break
+        except Exception as e:
+            logging.info(traceback.format_exc())
 
 
 if __name__ == '__main__':
@@ -119,5 +133,4 @@ if __name__ == '__main__':
         p.join()
         print('All subProcesses done.')
     except Exception as e:
-        logging.info(traceback.format_exc())
-
+        logging.info(traceback.print_exc())
